@@ -2,7 +2,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // ★ routerを使うなら残す
 import { useState, FormEvent, ChangeEvent } from "react";
 import Link from "next/link";
 
@@ -20,21 +20,18 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 
-// 選択肢の定義
+// 選択肢の定義 (共通化推奨)
 const technologyOptions = [
   "JavaScript", "TypeScript", "Python", "React", "Next.js", "Node.js", "Supabase", "Tailwind CSS", "HTML", "CSS"
-  // ... 他にも必要な技術を追加
 ];
 const categoryOptions = [
   "Webアプリケーション開発", "LP・Webサイト制作", "業務効率化ツール開発", "プロトタイプ開発", "その他"
-  // ... 他にも必要なカテゴリを追加
 ];
 const roleOptions = [
   "企画・要件定義", "プロジェクト管理", "UI/UXデザイン", "フロントエンド開発", "バックエンド開発", "データベース設計"
-  // ... 他にも必要な役割を追加
 ];
 
-// フォームデータの型定義
+// フォームデータの型定義 (共通化推奨)
 interface PortfolioFormData {
   title: string;
   description: string;
@@ -43,13 +40,13 @@ interface PortfolioFormData {
   demo_url: string;
   github_url: string;
   is_published: boolean;
-  sort_order: number | string;
+  sort_order: number | string; // 空文字を許容するためstringも含む
   category: string;
   roles_responsible: string[];
 }
 
 export default function NewPortfolioPage() {
-  const router = useRouter();
+  const router = useRouter(); // ★ リダイレクトに使うので残します
   const [formData, setFormData] = useState<PortfolioFormData>({
     title: "",
     description: "",
@@ -57,37 +54,34 @@ export default function NewPortfolioPage() {
     technologies: [],
     demo_url: "",
     github_url: "",
-    is_published: false, // デフォルトは下書き (false)
+    is_published: false,
     sort_order: 0,
-    category: "", // 初期値を空文字列に
+    category: "",
     roles_responsible: [],
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // 保存処理中
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleInputChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> // Selectは別途処理
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
     // HTMLInputElementにキャストしてcheckedプロパティにアクセス
-    const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
+    // const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
+    // is_published は Select で扱うため、この分岐は不要
 
-    if (name === "is_published_toggle") { // もしトグルスイッチを使う場合の仮の処理
-        setFormData((prev) => ({ ...prev, is_published: checked! }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: type === 'number' && name === 'sort_order' ? (value === '' ? '' : Number(value)) : value,
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' && name === 'sort_order' ? (value === '' ? '' : Number(value)) : value,
+    }));
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFormData((prev) => ({ ...prev, thumbnail_file: e.target.files![0] }));
     } else {
-      setFormData((prev) => ({ ...prev, thumbnail_file: null })); // ファイル選択がキャンセルされた場合
+      setFormData((prev) => ({ ...prev, thumbnail_file: null }));
     }
   };
 
@@ -124,8 +118,9 @@ export default function NewPortfolioPage() {
       let thumbnailUrl = null;
       if (formData.thumbnail_file) {
         const file = formData.thumbnail_file;
-        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`; // スペースをアンダースコアに置換
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+        // const { data: uploadData, error: uploadError } = await supabase.storage // ★ uploadData は使わないので削除
+        const { error: uploadError } = await supabase.storage
           .from("portfolio-thumbnails")
           .upload(fileName, file);
 
@@ -146,13 +141,16 @@ export default function NewPortfolioPage() {
         github_url: formData.github_url || null,
         is_published: formData.is_published,
         sort_order: formData.sort_order === '' ? 0 : Number(formData.sort_order),
-        category: formData.category || null, // カテゴリが空文字列ならnullを許容するならこのまま
+        category: formData.category || null,
         roles_responsible: formData.roles_responsible.length > 0 ? formData.roles_responsible : null,
+        // created_at は Supabase が自動で設定
+        // updated_at は新規作成時は不要 (または created_at と同じ値を設定しても良い)
       };
 
       const { error: insertError } = await supabase
         .from("portfolios")
-        .insert([dataToSave]);
+        .insert([dataToSave])
+        .select(); // ★ .select() を追加して、成功時にデータが返るようにする (必須ではないが、エラー詳細が得られる場合がある)
 
       if (insertError) throw insertError;
 
@@ -161,11 +159,11 @@ export default function NewPortfolioPage() {
         title: "", description: "", thumbnail_file: null, technologies: [], demo_url: "",
         github_url: "", is_published: false, sort_order: 0, category: "", roles_responsible: [],
       });
-      // router.push("/portfolios"); // 必要なら一覧ページへリダイレクト
+      router.push("/portfolios"); // ★ 作成後一覧ページへリダイレクト
 
-    } catch (err: any) {
+    } catch (err: unknown) { // ★ any から unknown へ変更
       console.error("Error creating portfolio item:", err);
-      setError(err.message || "Failed to create portfolio item.");
+      setError(err instanceof Error ? err.message : "Failed to create portfolio item.");
     } finally {
       setLoading(false);
     }
@@ -182,20 +180,20 @@ export default function NewPortfolioPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* タイトル */}
           <div>
-            <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
-            <Input id="title" name="title" value={formData.title} onChange={handleInputChange} required />
+            <Label htmlFor="title-new">Title <span className="text-red-500">*</span></Label> {/* ★ id/htmlFor を変更 */}
+            <Input id="title-new" name="title" value={formData.title} onChange={handleInputChange} required />
           </div>
 
           {/* 概要説明 */}
           <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={5} />
+            <Label htmlFor="description-new">Description</Label> {/* ★ id/htmlFor を変更 */}
+            <Textarea id="description-new" name="description" value={formData.description} onChange={handleInputChange} rows={5} />
           </div>
 
           {/* サムネイル画像 */}
           <div>
-            <Label htmlFor="thumbnail_file">Thumbnail Image</Label>
-            <Input id="thumbnail_file" name="thumbnail_file" type="file" onChange={handleFileChange} accept="image/*" />
+            <Label htmlFor="thumbnail_file-new">Thumbnail Image</Label> {/* ★ id/htmlFor を変更 */}
+            <Input id="thumbnail_file-new" name="thumbnail_file" type="file" onChange={handleFileChange} accept="image/*" />
             {formData.thumbnail_file && <p className="text-sm mt-1">Selected: {formData.thumbnail_file.name}</p>}
           </div>
 
@@ -206,11 +204,11 @@ export default function NewPortfolioPage() {
               {technologyOptions.map((tech) => (
                 <div key={tech} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`tech-${tech}`}
+                    id={`new-tech-${tech}`} // ★ id を変更
                     checked={formData.technologies.includes(tech)}
                     onCheckedChange={() => handleCheckboxChange("technologies", tech)}
                   />
-                  <Label htmlFor={`tech-${tech}`} className="font-normal cursor-pointer">{tech}</Label>
+                  <Label htmlFor={`new-tech-${tech}`} className="font-normal cursor-pointer">{tech}</Label>
                 </div>
               ))}
             </div>
@@ -218,17 +216,16 @@ export default function NewPortfolioPage() {
 
           {/* カテゴリ (セレクトボックス) */}
           <div>
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category-new">Category</Label> {/* ★ id/htmlFor を変更 */}
             <Select
-              name="category"
+              name="category" // このnameは実際には使われない
               value={formData.category}
               onValueChange={(value) => handleSelectChange("category", value)}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="-- Select Category --" /> {/* プレースホルダーを指定 */}
+              <SelectTrigger id="category-new"> {/* ★ id を変更 */}
+                <SelectValue placeholder="-- Select Category --" />
               </SelectTrigger>
               <SelectContent>
-                {/* プレースホルダー用の Item は削除、または value に空でない一意の値を設定 */}
                 {categoryOptions.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
@@ -245,11 +242,11 @@ export default function NewPortfolioPage() {
               {roleOptions.map((role) => (
                 <div key={role} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`role-${role}`}
+                    id={`new-role-${role}`} // ★ id を変更
                     checked={formData.roles_responsible.includes(role)}
                     onCheckedChange={() => handleCheckboxChange("roles_responsible", role)}
                   />
-                  <Label htmlFor={`role-${role}`} className="font-normal cursor-pointer">{role}</Label>
+                  <Label htmlFor={`new-role-${role}`} className="font-normal cursor-pointer">{role}</Label>
                 </div>
               ))}
             </div>
@@ -257,31 +254,31 @@ export default function NewPortfolioPage() {
 
           {/* デモサイトURL */}
           <div>
-            <Label htmlFor="demo_url">Demo URL</Label>
-            <Input id="demo_url" name="demo_url" type="url" value={formData.demo_url} onChange={handleInputChange} placeholder="https://example.com/demo" />
+            <Label htmlFor="demo_url-new">Demo URL</Label> {/* ★ id/htmlFor を変更 */}
+            <Input id="demo_url-new" name="demo_url" type="url" value={formData.demo_url} onChange={handleInputChange} placeholder="https://example.com/demo" />
           </div>
 
           {/* GitHubリポジトリURL */}
           <div>
-            <Label htmlFor="github_url">GitHub URL</Label>
-            <Input id="github_url" name="github_url" type="url" value={formData.github_url} onChange={handleInputChange} placeholder="https://github.com/yourname/project" />
+            <Label htmlFor="github_url-new">GitHub URL</Label> {/* ★ id/htmlFor を変更 */}
+            <Input id="github_url-new" name="github_url" type="url" value={formData.github_url} onChange={handleInputChange} placeholder="https://github.com/yourname/project" />
           </div>
 
           {/* 表示順 */}
           <div>
-            <Label htmlFor="sort_order">Sort Order</Label>
-            <Input id="sort_order" name="sort_order" type="number" value={formData.sort_order} onChange={handleInputChange} />
+            <Label htmlFor="sort_order-new">Sort Order</Label> {/* ★ id/htmlFor を変更 */}
+            <Input id="sort_order-new" name="sort_order" type="number" value={formData.sort_order} onChange={handleInputChange} />
           </div>
 
           {/* 公開ステータス (セレクトボックス例) */}
           <div>
-            <Label htmlFor="is_published_select">Status <span className="text-red-500">*</span></Label>
+            <Label htmlFor="is_published_select-new">Status <span className="text-red-500">*</span></Label> {/* ★ id/htmlFor を変更 */}
             <Select
-              name="is_published_select"
-              value={String(formData.is_published)} // "true" または "false"
+              name="is_published_select" // このnameは実際には使われない
+              value={String(formData.is_published)}
               onValueChange={(value) => handleSelectChange("is_published_select", value)}
             >
-                <SelectTrigger>
+                <SelectTrigger id="is_published_select-new"> {/* ★ id を変更 */}
                     <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>

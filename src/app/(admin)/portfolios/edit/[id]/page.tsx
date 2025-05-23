@@ -2,9 +2,10 @@
 "use client";
 
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter, useParams } from "next/navigation"; // useParamsを追加
-import { useState, FormEvent, ChangeEvent, useEffect } from "react"; // useEffectを追加
+import { useRouter, useParams } from "next/navigation";
+import { useState, FormEvent, ChangeEvent, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image"; // ★ next/image をインポート
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,25 +32,44 @@ const roleOptions = [
   "企画・要件定義", "プロジェクト管理", "UI/UXデザイン", "フロントエンド開発", "バックエンド開発", "データベース設計"
 ];
 
-// フォームデータの型定義 (new/page.tsx と同じ)
+// フォームデータの型定義
 interface PortfolioFormData {
   title: string;
   description: string;
-  thumbnail_file: File | null; // 新しい画像をアップロードする場合
-  existing_thumbnail_url: string | null; // 既存の画像URL
+  thumbnail_file: File | null;
+  existing_thumbnail_url: string | null;
   technologies: string[];
   demo_url: string;
   github_url: string;
   is_published: boolean;
-  sort_order: number | string;
+  sort_order: number | string; // 空文字を許容するためstringも含む
   category: string;
   roles_responsible: string[];
 }
 
+// Supabaseから取得するデータの型
+interface PortfolioDatabaseItem {
+    id: string;
+    created_at: string;
+    title: string;
+    description: string | null;
+    thumbnail_url: string | null;
+    technologies: string[] | null;
+    demo_url: string | null;
+    github_url: string | null;
+    is_published: boolean;
+    sort_order: number;
+    category: string | null;
+    roles_responsible: string[] | null;
+    updated_at?: string; // 更新日時はオプショナル
+    // 他にもカラムがあれば追加
+}
+
+
 export default function EditPortfolioPage() {
-  const router = useRouter();
-  const params = useParams(); // URLパラメータからidを取得
-  const itemId = params.id as string; // string型であることを明示
+  const router = useRouter(); // ★ リダイレクトに使うので残します
+  const params = useParams();
+  const itemId = params.id as string;
 
   const [formData, setFormData] = useState<PortfolioFormData>({
     title: "",
@@ -64,46 +84,50 @@ export default function EditPortfolioPage() {
     category: "",
     roles_responsible: [],
   });
-  const [loading, setLoading] = useState(true); // 初期データロード中も考慮
-  const [saving, setSaving] = useState(false);   // 保存処理中
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // 初期データの読み込み
   useEffect(() => {
-    if (!itemId) return;
+    if (!itemId) {
+        setError("Portfolio ID is missing.");
+        setLoading(false);
+        return;
+    }
 
     const fetchPortfolioItem = async () => {
       setLoading(true);
       setError(null);
       try {
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from("portfolios")
-          .select("*") // 全カラムを取得
+          .select("*")
           .eq("id", itemId)
-          .single(); // 1件のデータを取得
+          .single<PortfolioDatabaseItem>(); // ★ 型アサーションを追加
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
+
         if (data) {
           setFormData({
             title: data.title || "",
             description: data.description || "",
-            thumbnail_file: null, // 初期はファイル選択なし
+            thumbnail_file: null,
             existing_thumbnail_url: data.thumbnail_url || null,
             technologies: data.technologies || [],
             demo_url: data.demo_url || "",
             github_url: data.github_url || "",
             is_published: data.is_published || false,
-            sort_order: data.sort_order === null ? '' : data.sort_order, // nullなら空文字
+            sort_order: data.sort_order === null ? '' : data.sort_order.toString(), // number | string に合わせる
             category: data.category || "",
             roles_responsible: data.roles_responsible || [],
           });
         } else {
           setError("Portfolio item not found.");
         }
-      } catch (err: any) {
+      } catch (err: unknown) { // ★ any から unknown へ変更
         console.error("Error fetching portfolio item:", err);
-        setError(err.message || "Failed to fetch portfolio item.");
+        setError(err instanceof Error ? err.message : "Failed to fetch portfolio item.");
       } finally {
         setLoading(false);
       }
@@ -112,26 +136,32 @@ export default function EditPortfolioPage() {
   }, [itemId]);
 
 
-  // フォーム入力ハンドラ (new/page.tsx とほぼ同じ)
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
+    // HTMLInputElementにキャストしてcheckedプロパティにアクセス
     const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
-    if (name === "is_published_toggle") {
-        setFormData((prev) => ({ ...prev, is_published: checked! }));
-    } else {
+
+    // is_published_toggle のような特別な名前の処理は削除 (is_published_selectで処理するため)
+    // if (name === "is_published_toggle") {
+    //     setFormData((prev) => ({ ...prev, is_published: checked! }));
+    // } else {
       setFormData((prev) => ({
         ...prev,
         [name]: type === 'number' && name === 'sort_order' ? (value === '' ? '' : Number(value)) : value,
       }));
-    }
+    // }
   };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData((prev) => ({ ...prev, thumbnail_file: e.target.files![0], existing_thumbnail_url: null })); // 新しいファイルが選択されたら既存URLはクリア(表示上)
+      setFormData((prev) => ({ ...prev, thumbnail_file: e.target.files![0] }));
+      // 新しいファイルが選択されたら、既存の画像URLの表示を更新するために existing_thumbnail_url をクリアしても良いが、
+      // アップロード失敗時に戻せるように、ここではクリアしない。表示側で制御。
     } else {
       setFormData((prev) => ({ ...prev, thumbnail_file: null }));
     }
   };
+
   const handleCheckboxChange = (field: "technologies" | "roles_responsible", value: string) => {
     setFormData((prev) => {
       const currentValues = prev[field];
@@ -142,10 +172,11 @@ export default function EditPortfolioPage() {
       }
     });
   };
+
   const handleSelectChange = (field: "category" | "is_published_select", value: string) => {
     if (field === "is_published_select") {
         setFormData(prev => ({ ...prev, is_published: value === "true" }));
-    } else {
+    } else { // category の場合
         setFormData(prev => ({ ...prev, [field]: value }));
     }
   };
@@ -157,35 +188,37 @@ export default function EditPortfolioPage() {
     setSuccessMessage(null);
 
     try {
-      let thumbnailUrl = formData.existing_thumbnail_url; // デフォルトは既存のURL
+      let thumbnailUrl = formData.existing_thumbnail_url;
 
-      // 1. 新しい画像がアップロードされた場合のみStorageに保存
       if (formData.thumbnail_file) {
         const file = formData.thumbnail_file;
         const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // const { data: uploadData, error: uploadError } = await supabase.storage // ★ uploadData は使わないので削除
+        const { error: uploadError } = await supabase.storage
           .from("portfolio-thumbnails")
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
+        // 古い画像を削除するロジック (オプション)
+        if (formData.existing_thumbnail_url) {
+            const oldFileNameMatch = formData.existing_thumbnail_url.match(/[^/]+$/);
+            if (oldFileNameMatch && oldFileNameMatch[0]) {
+                const oldFileName = decodeURIComponent(oldFileNameMatch[0]); // URLデコード
+                await supabase.storage.from("portfolio-thumbnails").remove([oldFileName]);
+            }
+        }
+
         const { data: publicUrlData } = supabase.storage
           .from("portfolio-thumbnails")
           .getPublicUrl(fileName);
         thumbnailUrl = publicUrlData.publicUrl;
-
-        // (任意) もし既存の画像があり、新しい画像に置き換えるなら、古い画像をStorageから削除する処理もここに追加できる
-        // if (formData.existing_thumbnail_url) {
-        //   const oldFileName = formData.existing_thumbnail_url.split('/').pop();
-        //   if (oldFileName) await supabase.storage.from("portfolio-thumbnails").remove([oldFileName]);
-        // }
       }
 
-      // 2. データベースへの更新データ準備
       const dataToUpdate = {
         title: formData.title,
         description: formData.description || null,
-        thumbnail_url: thumbnailUrl, // 新しいURLまたは既存のURL
+        thumbnail_url: thumbnailUrl,
         technologies: formData.technologies.length > 0 ? formData.technologies : null,
         demo_url: formData.demo_url || null,
         github_url: formData.github_url || null,
@@ -193,30 +226,34 @@ export default function EditPortfolioPage() {
         sort_order: formData.sort_order === '' ? 0 : Number(formData.sort_order),
         category: formData.category || null,
         roles_responsible: formData.roles_responsible.length > 0 ? formData.roles_responsible : null,
-        updated_at: new Date().toISOString(), // 更新日時をセット
+        updated_at: new Date().toISOString(),
       };
 
-      // 3. データベースを更新
       const { error: updateError } = await supabase
         .from("portfolios")
         .update(dataToUpdate)
-        .eq("id", itemId); // 更新対象のIDを指定
+        .eq("id", itemId);
 
       if (updateError) throw updateError;
 
       setSuccessMessage("Portfolio item updated successfully!");
-      // router.push("/portfolios"); // 更新後一覧ページにリダイレクト
+      setFormData(prev => ({ // フォームデータを新しいサムネイルURLで更新
+        ...prev,
+        existing_thumbnail_url: thumbnailUrl,
+        thumbnail_file: null, // 新規ファイル選択はリセット
+      }));
+      // router.push("/portfolios"); // ★ 更新後一覧ページにリダイレクトする場合
 
-    } catch (err: any) {
+    } catch (err: unknown) { // ★ any から unknown へ変更
       console.error("Error updating portfolio item:", err);
-      setError(err.message || "Failed to update portfolio item.");
+      setError(err instanceof Error ? err.message : "Failed to update portfolio item.");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <p className="p-4">Loading item data...</p>;
-  if (error && !formData.title) return <p className="p-4 text-red-500">Error: {error}</p>; // 初期ロードエラーでデータがない場合
+  if (loading) return <p className="p-4 text-center">Loading item data...</p>;
+  if (error && !formData.title && !itemId) return <p className="p-4 text-red-500 text-center">Error: {error}</p>;
 
   return (
     <Card className="max-w-3xl mx-auto my-8">
@@ -227,7 +264,6 @@ export default function EditPortfolioPage() {
         {error && <p className="mb-4 text-sm text-red-500 bg-red-100 p-3 rounded-md">Error: {error}</p>}
         {successMessage && <p className="mb-4 text-sm text-green-500 bg-green-100 p-3 rounded-md">{successMessage}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 各フォーム項目 (new/page.tsx とほぼ同じUI) */}
           {/* タイトル */}
           <div>
             <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
@@ -243,10 +279,19 @@ export default function EditPortfolioPage() {
           {/* サムネイル画像 */}
           <div>
             <Label htmlFor="thumbnail_file">Thumbnail Image (Leave blank to keep existing)</Label>
-            {formData.existing_thumbnail_url && (
+            {formData.existing_thumbnail_url && !formData.thumbnail_file && ( // 新しいファイルが選択されていない場合のみ既存画像を表示
               <div className="my-2">
                 <p className="text-sm">Current image:</p>
-                <img src={formData.existing_thumbnail_url} alt="Current Thumbnail" className="max-w-xs max-h-32 object-contain border rounded-md" />
+                {/* ★ img を Image に置き換え */}
+                <div className="relative w-full max-w-xs h-32"> {/* サイズ調整用のコンテナ */}
+                  <Image
+                    src={formData.existing_thumbnail_url}
+                    alt="Current Thumbnail"
+                    fill // fill を使う場合は親要素に position: relative と width/height が必要
+                    style={{ objectFit: "contain" }} // アスペクト比を保ちつつコンテナに収める
+                    className="border rounded-md"
+                  />
+                </div>
               </div>
             )}
             <Input id="thumbnail_file" name="thumbnail_file" type="file" onChange={handleFileChange} accept="image/*" />
@@ -260,11 +305,11 @@ export default function EditPortfolioPage() {
               {technologyOptions.map((tech) => (
                 <div key={tech} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`tech-${tech}`}
+                    id={`edit-tech-${tech}`} // ★ idがnewページと被らないように変更
                     checked={formData.technologies.includes(tech)}
                     onCheckedChange={() => handleCheckboxChange("technologies", tech)}
                   />
-                  <Label htmlFor={`tech-${tech}`} className="font-normal cursor-pointer">{tech}</Label>
+                  <Label htmlFor={`edit-tech-${tech}`} className="font-normal cursor-pointer">{tech}</Label>
                 </div>
               ))}
             </div>
@@ -278,7 +323,7 @@ export default function EditPortfolioPage() {
               value={formData.category}
               onValueChange={(value) => handleSelectChange("category", value)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="category"> {/* ★ SelectTriggerにもidを振るとLabelと連携できる */}
                 <SelectValue placeholder="-- Select Category --" />
               </SelectTrigger>
               <SelectContent>
@@ -296,11 +341,11 @@ export default function EditPortfolioPage() {
               {roleOptions.map((role) => (
                 <div key={role} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`role-${role}`}
+                    id={`edit-role-${role}`} // ★ idがnewページと被らないように変更
                     checked={formData.roles_responsible.includes(role)}
                     onCheckedChange={() => handleCheckboxChange("roles_responsible", role)}
                   />
-                  <Label htmlFor={`role-${role}`} className="font-normal cursor-pointer">{role}</Label>
+                  <Label htmlFor={`edit-role-${role}`} className="font-normal cursor-pointer">{role}</Label>
                 </div>
               ))}
             </div>
@@ -328,11 +373,11 @@ export default function EditPortfolioPage() {
           <div>
             <Label htmlFor="is_published_select">Status <span className="text-red-500">*</span></Label>
             <Select
-              name="is_published_select"
+              name="is_published_select" // このnameは実際には使われない
               value={String(formData.is_published)}
               onValueChange={(value) => handleSelectChange("is_published_select", value)}
             >
-                <SelectTrigger>
+                <SelectTrigger id="is_published_select"> {/* ★ SelectTriggerにもidを振る */}
                     <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
