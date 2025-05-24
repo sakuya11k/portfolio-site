@@ -26,20 +26,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Card } from "@/components/ui/card"; // ★ Card コンポーネントをインポート
+import { Card } from "@/components/ui/card";
 
-// sonner を使う場合はインポート (インストールが必要: npm install sonner)
-// import { toast } from "sonner";
-
-// ポートフォリオアイテムの型 (表示に必要な項目に絞るか、editページと共通の型を使う)
 interface PortfolioListItem {
   id: string;
   title: string;
   category: string | null;
   is_published: boolean;
   sort_order: number;
-  created_at: string; // または Date型
-  thumbnail_url: string | null; // サムネイルURLも追加 (削除時に使う可能性)
+  created_at: string;
+  thumbnail_url: string | null;
 }
 
 export default function AdminPortfoliosPage() {
@@ -123,7 +119,7 @@ export default function AdminPortfoliosPage() {
       {portfolios.length === 0 ? (
         <p className="text-center text-slate-500 dark:text-slate-400">No portfolio items found. Add one!</p>
       ) : (
-        <Card> {/* ここでCardを使用 */}
+        <Card>
           <Table>
             <TableHeader>
               <TableRow>
@@ -168,7 +164,8 @@ export default function AdminPortfoliosPage() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure you want to delete "{itemToDelete?.title}"?</AlertDialogTitle>
+                          {/* ★ react/no-unescaped-entities の修正: テンプレートリテラルを使用 */}
+                          <AlertDialogTitle>{`Are you sure you want to delete "${itemToDelete?.title || ''}"?`}</AlertDialogTitle>
                           <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the portfolio item.
                             {itemToDelete?.thumbnail_url && " The associated thumbnail image will also be deleted."}

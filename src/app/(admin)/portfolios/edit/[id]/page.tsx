@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRouter, useParams } from "next/navigation";
 import { useState, FormEvent, ChangeEvent, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image"; // ★ next/image をインポート
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 
-// 選択肢の定義 (new/page.tsx と同じものを使用)
 const technologyOptions = [
   "JavaScript", "TypeScript", "Python", "React", "Next.js", "Node.js", "Supabase", "Tailwind CSS", "HTML", "CSS"
 ];
@@ -32,7 +31,6 @@ const roleOptions = [
   "企画・要件定義", "プロジェクト管理", "UI/UXデザイン", "フロントエンド開発", "バックエンド開発", "データベース設計"
 ];
 
-// フォームデータの型定義
 interface PortfolioFormData {
   title: string;
   description: string;
@@ -42,12 +40,11 @@ interface PortfolioFormData {
   demo_url: string;
   github_url: string;
   is_published: boolean;
-  sort_order: number | string; // 空文字を許容するためstringも含む
+  sort_order: number | string;
   category: string;
   roles_responsible: string[];
 }
 
-// Supabaseから取得するデータの型
 interface PortfolioDatabaseItem {
     id: string;
     created_at: string;
@@ -61,13 +58,12 @@ interface PortfolioDatabaseItem {
     sort_order: number;
     category: string | null;
     roles_responsible: string[] | null;
-    updated_at?: string; // 更新日時はオプショナル
-    // 他にもカラムがあれば追加
+    updated_at?: string;
 }
 
 
 export default function EditPortfolioPage() {
-  const router = useRouter(); // ★ リダイレクトに使うので残します
+  const router = useRouter(); // ★ routerを使用するので残す
   const params = useParams();
   const itemId = params.id as string;
 
@@ -104,7 +100,7 @@ export default function EditPortfolioPage() {
           .from("portfolios")
           .select("*")
           .eq("id", itemId)
-          .single<PortfolioDatabaseItem>(); // ★ 型アサーションを追加
+          .single<PortfolioDatabaseItem>();
 
         if (fetchError) throw fetchError;
 
@@ -118,14 +114,14 @@ export default function EditPortfolioPage() {
             demo_url: data.demo_url || "",
             github_url: data.github_url || "",
             is_published: data.is_published || false,
-            sort_order: data.sort_order === null ? '' : data.sort_order.toString(), // number | string に合わせる
+            sort_order: data.sort_order === null ? '' : data.sort_order.toString(),
             category: data.category || "",
             roles_responsible: data.roles_responsible || [],
           });
         } else {
           setError("Portfolio item not found.");
         }
-      } catch (err: unknown) { // ★ any から unknown へ変更
+      } catch (err: unknown) {
         console.error("Error fetching portfolio item:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch portfolio item.");
       } finally {
@@ -138,25 +134,16 @@ export default function EditPortfolioPage() {
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    // HTMLInputElementにキャストしてcheckedプロパティにアクセス
-    const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined;
-
-    // is_published_toggle のような特別な名前の処理は削除 (is_published_selectで処理するため)
-    // if (name === "is_published_toggle") {
-    //     setFormData((prev) => ({ ...prev, is_published: checked! }));
-    // } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: type === 'number' && name === 'sort_order' ? (value === '' ? '' : Number(value)) : value,
-      }));
-    // }
+    // const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : undefined; // ★ checked は未使用なので削除
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' && name === 'sort_order' ? (value === '' ? '' : Number(value)) : value,
+    }));
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFormData((prev) => ({ ...prev, thumbnail_file: e.target.files![0] }));
-      // 新しいファイルが選択されたら、既存の画像URLの表示を更新するために existing_thumbnail_url をクリアしても良いが、
-      // アップロード失敗時に戻せるように、ここではクリアしない。表示側で制御。
     } else {
       setFormData((prev) => ({ ...prev, thumbnail_file: null }));
     }
@@ -176,7 +163,7 @@ export default function EditPortfolioPage() {
   const handleSelectChange = (field: "category" | "is_published_select", value: string) => {
     if (field === "is_published_select") {
         setFormData(prev => ({ ...prev, is_published: value === "true" }));
-    } else { // category の場合
+    } else {
         setFormData(prev => ({ ...prev, [field]: value }));
     }
   };
@@ -193,18 +180,16 @@ export default function EditPortfolioPage() {
       if (formData.thumbnail_file) {
         const file = formData.thumbnail_file;
         const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        // const { data: uploadData, error: uploadError } = await supabase.storage // ★ uploadData は使わないので削除
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage // ★ uploadData を受け取らないように変更
           .from("portfolio-thumbnails")
           .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        // 古い画像を削除するロジック (オプション)
         if (formData.existing_thumbnail_url) {
             const oldFileNameMatch = formData.existing_thumbnail_url.match(/[^/]+$/);
             if (oldFileNameMatch && oldFileNameMatch[0]) {
-                const oldFileName = decodeURIComponent(oldFileNameMatch[0]); // URLデコード
+                const oldFileName = decodeURIComponent(oldFileNameMatch[0]);
                 await supabase.storage.from("portfolio-thumbnails").remove([oldFileName]);
             }
         }
@@ -237,14 +222,13 @@ export default function EditPortfolioPage() {
       if (updateError) throw updateError;
 
       setSuccessMessage("Portfolio item updated successfully!");
-      setFormData(prev => ({ // フォームデータを新しいサムネイルURLで更新
+      setFormData(prev => ({
         ...prev,
         existing_thumbnail_url: thumbnailUrl,
-        thumbnail_file: null, // 新規ファイル選択はリセット
+        thumbnail_file: null,
       }));
-      // router.push("/portfolios"); // ★ 更新後一覧ページにリダイレクトする場合
-
-    } catch (err: unknown) { // ★ any から unknown へ変更
+      router.push("/portfolios"); // ★ 更新後一覧ページにリダイレクト
+    } catch (err: unknown) {
       console.error("Error updating portfolio item:", err);
       setError(err instanceof Error ? err.message : "Failed to update portfolio item.");
     } finally {
@@ -264,31 +248,25 @@ export default function EditPortfolioPage() {
         {error && <p className="mb-4 text-sm text-red-500 bg-red-100 p-3 rounded-md">Error: {error}</p>}
         {successMessage && <p className="mb-4 text-sm text-green-500 bg-green-100 p-3 rounded-md">{successMessage}</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* タイトル */}
           <div>
             <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
             <Input id="title" name="title" value={formData.title} onChange={handleInputChange} required />
           </div>
-
-          {/* 概要説明 */}
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" name="description" value={formData.description} onChange={handleInputChange} rows={5} />
           </div>
-
-          {/* サムネイル画像 */}
           <div>
             <Label htmlFor="thumbnail_file">Thumbnail Image (Leave blank to keep existing)</Label>
-            {formData.existing_thumbnail_url && !formData.thumbnail_file && ( // 新しいファイルが選択されていない場合のみ既存画像を表示
+            {formData.existing_thumbnail_url && !formData.thumbnail_file && (
               <div className="my-2">
                 <p className="text-sm">Current image:</p>
-                {/* ★ img を Image に置き換え */}
-                <div className="relative w-full max-w-xs h-32"> {/* サイズ調整用のコンテナ */}
+                <div className="relative w-full max-w-xs h-32">
                   <Image
                     src={formData.existing_thumbnail_url}
                     alt="Current Thumbnail"
-                    fill // fill を使う場合は親要素に position: relative と width/height が必要
-                    style={{ objectFit: "contain" }} // アスペクト比を保ちつつコンテナに収める
+                    fill
+                    style={{ objectFit: "contain" }}
                     className="border rounded-md"
                   />
                 </div>
@@ -297,15 +275,13 @@ export default function EditPortfolioPage() {
             <Input id="thumbnail_file" name="thumbnail_file" type="file" onChange={handleFileChange} accept="image/*" />
             {formData.thumbnail_file && <p className="text-sm mt-1">New image selected: {formData.thumbnail_file.name}</p>}
           </div>
-
-          {/* 使用技術 (チェックボックス) */}
           <div>
             <Label className="mb-2 block font-medium">Technologies</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 border rounded-md">
               {technologyOptions.map((tech) => (
                 <div key={tech} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`edit-tech-${tech}`} // ★ idがnewページと被らないように変更
+                    id={`edit-tech-${tech}`}
                     checked={formData.technologies.includes(tech)}
                     onCheckedChange={() => handleCheckboxChange("technologies", tech)}
                   />
@@ -314,8 +290,6 @@ export default function EditPortfolioPage() {
               ))}
             </div>
           </div>
-
-          {/* カテゴリ (セレクトボックス) */}
           <div>
             <Label htmlFor="category">Category</Label>
             <Select
@@ -323,7 +297,7 @@ export default function EditPortfolioPage() {
               value={formData.category}
               onValueChange={(value) => handleSelectChange("category", value)}
             >
-              <SelectTrigger id="category"> {/* ★ SelectTriggerにもidを振るとLabelと連携できる */}
+              <SelectTrigger id="category">
                 <SelectValue placeholder="-- Select Category --" />
               </SelectTrigger>
               <SelectContent>
@@ -333,15 +307,13 @@ export default function EditPortfolioPage() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* 担当した役割 (チェックボックス) */}
           <div>
             <Label className="mb-2 block font-medium">Roles Responsible</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 border rounded-md">
               {roleOptions.map((role) => (
                 <div key={role} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`edit-role-${role}`} // ★ idがnewページと被らないように変更
+                    id={`edit-role-${role}`}
                     checked={formData.roles_responsible.includes(role)}
                     onCheckedChange={() => handleCheckboxChange("roles_responsible", role)}
                   />
@@ -350,34 +322,26 @@ export default function EditPortfolioPage() {
               ))}
             </div>
           </div>
-
-          {/* デモサイトURL */}
           <div>
             <Label htmlFor="demo_url">Demo URL</Label>
             <Input id="demo_url" name="demo_url" type="url" value={formData.demo_url} onChange={handleInputChange} placeholder="https://example.com/demo" />
           </div>
-
-          {/* GitHubリポジトリURL */}
           <div>
             <Label htmlFor="github_url">GitHub URL</Label>
             <Input id="github_url" name="github_url" type="url" value={formData.github_url} onChange={handleInputChange} placeholder="https://github.com/yourname/project" />
           </div>
-
-          {/* 表示順 */}
           <div>
             <Label htmlFor="sort_order">Sort Order</Label>
             <Input id="sort_order" name="sort_order" type="number" value={formData.sort_order} onChange={handleInputChange} />
           </div>
-
-          {/* 公開ステータス */}
           <div>
             <Label htmlFor="is_published_select">Status <span className="text-red-500">*</span></Label>
             <Select
-              name="is_published_select" // このnameは実際には使われない
+              name="is_published_select"
               value={String(formData.is_published)}
               onValueChange={(value) => handleSelectChange("is_published_select", value)}
             >
-                <SelectTrigger id="is_published_select"> {/* ★ SelectTriggerにもidを振る */}
+                <SelectTrigger id="is_published_select">
                     <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -386,7 +350,6 @@ export default function EditPortfolioPage() {
                 </SelectContent>
             </Select>
           </div>
-
           <CardFooter className="flex justify-end space-x-2 pt-6">
             <Link href="/portfolios">
               <Button variant="outline" type="button">Cancel</Button>

@@ -11,16 +11,12 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 
-// --- lucide-react からアイコンをインポート ---
 import {
   FileCode, Paintbrush, Brain, Type, Atom, Network, Cog, DatabaseZap, Server, Zap, Star, TrendingUp,
   MonitorSmartphone, AppWindow, Settings2, Lightbulb, Gauge, Palette, ShieldCheck
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-// --- ここまでアイコンのインポート ---
-
-// ★ カルーセルコンポーネントをインポート
 import { CommitmentCarousel } from '@/components/ui/CommitmentCarousel';
 
 
@@ -91,9 +87,9 @@ export default function HomePage() {
 
         if (supabaseError) throw supabaseError;
         setPortfolioItems(data || []);
-      } catch (err: any) {
+      } catch (err: unknown) { // ★ any から unknown へ変更
         console.error("Error fetching published portfolios:", err);
-        setError(err.message || "Failed to fetch portfolios.");
+        setError(err instanceof Error ? err.message : "Failed to fetch portfolios.");
       } finally {
         setLoading(false);
       }
@@ -101,36 +97,36 @@ export default function HomePage() {
     fetchPublishedPortfolios();
   }, []);
 
-  // カルーセルに渡すこだわりポイントのデータ
   const commitmentItemsData: { id: number; title: string; description: string; IconComponent: LucideIcon }[] = [
     {
       id: 1,
       title: "パフォーマンスとUX",
       description: "Next.jsの最適化機能を最大限に活かし、サイト全体の軽快な動作と快適なユーザー体験の実現を目指しました。もちろん、レスポンシブデザインにも配慮し、どのデバイスからでも見やすいサイトを心がけています。",
-      IconComponent: Gauge, // lucide-reactのGaugeアイコン (前回提案から)
+      IconComponent: Gauge,
     },
     {
       id: 2,
       title: "デザインの一貫性と開発効率",
       description: "UIコンポーネントライブラリ shadcn/ui とユーティリティファーストな Tailwind CSS を組み合わせることで、サイト全体でデザインの一貫性を保ちつつ、迅速なUI開発を実現しました。これにより、見た目の美しさと開発スピードを両立させています。",
-      IconComponent: Palette, // lucide-reactのPaletteアイコン (前回提案から)
+      IconComponent: Palette,
     },
     {
       id: 3,
       title: "動的なコンテンツ管理",
       description: "ポートフォリオの実績を柔軟に追加・編集できるよう、認証機能を備えた管理画面をSupabaseを活用して構築しました。これにより、常に最新の情報をサイトに反映できる動的なシステムを実現しています。",
-      IconComponent: DatabaseZap, // lucide-reactのDatabaseZapアイコン (前回提案から)
+      IconComponent: DatabaseZap,
     },
     {
       id: 4,
       title: "コード品質への追求",
       description: "TypeScriptによる型付けを徹底することで、開発段階でのエラーを抑制し、コードの堅牢性を高めました。また、意味のあるコンポーネント分割や適切な命名規則を意識し、将来的なメンテナンスや機能追加が容易な、可読性と保守性の高いコードベースを目指しました。",
-      IconComponent: ShieldCheck, // lucide-reactのShieldCheckアイコン (前回提案から)
+      IconComponent: ShieldCheck,
     },
   ];
 
   return (
     <>
+      {/* ... (各セクションのJSXは変更なしなので省略します) ... */}
       {/* ===== Hero Section ===== */}
       <section className="bg-gradient-to-r from-slate-900 to-slate-700 text-white py-20 md:py-32">
          <div className="container mx-auto px-4 text-center">
@@ -234,12 +230,12 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="mt-10 flex justify-center space-x-4">
-              <Link href="https://x.com/EnSakya81360" target="_blank" rel="noopener noreferrer" aria-label="X (旧Twitter) プロフィール"> {/* ★ Xユーザー名を反映 */}
+              <Link href="https://x.com/EnSakya81360" target="_blank" rel="noopener noreferrer" aria-label="X (旧Twitter) プロフィール">
                 <Button variant="outline" size="icon" className="rounded-full transition-colors hover:bg-accent hover:text-accent-foreground">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                 </Button>
               </Link>
-              <Link href="https://www.threads.net/@sssayurh" target="_blank" rel="noopener noreferrer" aria-label="Threads プロフィール"> {/* ★ Threadsユーザー名を反映 */}
+              <Link href="https://www.threads.net/@sssayurh" target="_blank" rel="noopener noreferrer" aria-label="Threads プロフィール">
                 <Button variant="outline" size="icon" className="rounded-full transition-colors hover:bg-accent hover:text-accent-foreground">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10c.63 0 1.246-.062 1.842-.181l.093-.02.002.002c.01 0 .019-.002.03-.002.532-.105 1.033-.27 1.502-.482l.007-.003.003.001c.008-.003.016-.007.024-.01.42-.187.818-.418 1.19-.685l.004-.003.002.001c.004-.003.008-.006.012-.009.326-.23.63-.49.91-.776l.004-.004.001.002c.002-.003.004-.005.006-.008.242-.245.467-.51.67-.79l.004-.005.002.002c.002-.003.003-.005.005-.008.17-.238.328-.487.47-.746l.003-.005.002.002c.001-.003.002-.005.003-.007.118-.22.224-.446.318-.678l.003-.005c.001-.002.001-.003.002-.005.075-.19.142-.383.2-.578l.002-.005c.001-.002.001-.002.001-.004.042-.15.077-.3.105-.45l.001-.003c.001-.002.001-.002.001-.003.021-.116.036-.23.048-.345l.001-.003c.008-.102.012-.2.012-.3 0-.01 0-.02.002-.03.002-.02.002-.03.002-.05v-.02c0-.016.002-.03.002-.048l.001-.01c0-.01 0-.01.001-.02 0-.02.001-.04.001-.06 0-.63-.062-1.246-.181-1.842L21.8 10.1c.002-.01.002-.019.002-.03.105-.532.27-1.033.482-1.502l.003-.007.001.003c.003-.008.007-.016.01-.024.187-.42.418-.818.685-1.19l.003-.004.001.002c.003-.004.006-.008.009-.012.23-.326.49-.63.776-.91l.004-.004c.003-.002.005-.004.008-.006.245-.242.51-.467.79-.67l.005-.004c.003-.002.005-.003.008-.005.238-.17.487-.328.746-.47l.005-.003c.003-.001.005-.002.007-.003.22-.118.446-.224.678-.318l.005-.003c.002-.001.003-.001.005-.002.19-.075.383-.142.578-.2l.005-.002c.002-.001.002-.001.004-.001.15-.042.3-.077.45-.105l.003-.001c.002-.001.002-.001.003-.001.116-.021.23-.036.345-.048l.003-.001c.102-.008.2-.012.3-.012.01 0 .02 0 .03-.002.02-.002.03-.002.05-.002h.02c.016 0 .03-.002.048-.002l.01 0c.01 0 .01 0 .02-.001.02 0 .04-.001.06-.001C17.523 2.062 16.91 2 16.28 2 10.757 2 6.28 6.477 6.28 12S10.757 22 16.28 22c5.523 0 10-4.477 10-10 0-.63-.062-1.246-.181-1.842a9.98 9.98 0 0 0-1.819-4.682A9.98 9.98 0 0 0 16.28 2zm-4.278 14.89c-.818.49-1.745.76-2.722.76-2.37 0-4.308-1.81-4.308-4.04s1.938-4.04 4.308-4.04c.977 0 1.904.27 2.722.76V7.72H9.998v8.56h2.004v-2.99c0-.78.63-1.41 1.41-1.41.78 0 1.41.63 1.41 1.41v2.99h2.004V9.51c.818-.49 1.745-.76 2.722-.76 2.37 0 4.308 1.81 4.308 4.04s-1.938 4.04-4.308 4.04c-.977 0-1.904-.27-2.722-.76v1.61z"/></svg>
                 </Button>
