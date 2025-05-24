@@ -1,69 +1,98 @@
 // src/components/ui/CommitmentCarousel.tsx
-"use client";
+"use client"; // クライアントサイドのインタラクションがあるため
 
 import React, { useCallback, useEffect, useState } from 'react';
-// useEmblaCarousel とそのフックの戻り値の型を embla-carousel-react からインポート
-import useEmblaCarousel, { type UseEmblaCarouselType } from 'embla-carousel-react'; // ★ 修正済み
+// useEmblaCarousel のみを embla-carousel-react からインポート
+import useEmblaCarousel from 'embla-carousel-react';
 // Embla Carousel のコアな型定義を embla-carousel 本体からインポート
-import type { EmblaCarouselType, EmblaOptionsType } from 'embla-carousel'; // ★ 修正済み
+import type { EmblaCarouselType, EmblaOptionsType } from 'embla-carousel';
 import { ChevronLeft, ChevronRight, LucideIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // shadcn/uiのButtonを使用
 
+// スライドするアイテムのデータ型
 interface CommitmentItemData {
   id: number;
   title: string;
   description: string;
-  IconComponent: LucideIcon;
+  IconComponent: LucideIcon; // アイコンコンポーネントを受け取る
 }
 
+// カルーセルコンポーネントのPropsの型
 interface CommitmentCarouselProps {
-  slides: CommitmentItemData[];
-  options?: EmblaOptionsType;
+  slides: CommitmentItemData[]; // 表示するデータの配列
+  options?: EmblaOptionsType;   // Embla Carouselのオプション (embla-carousel からインポート)
 }
 
 export const CommitmentCarousel: React.FC<CommitmentCarouselProps> = ({ slides, options }) => {
+  // Embla Carouselの初期化とAPIの取得
+  // emblaApi の型は UseEmblaCarouselType だったが、直接は使わないので EmblaCarouselType | undefined で扱う
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'start', ...options });
+
+  // 前後のボタンの有効/無効状態を管理
   const [prevBtnDisabled, setPrevBtnDisabled] = useState(true);
   const [nextBtnDisabled, setNextBtnDisabled] = useState(true);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0); // 現在選択されているスライドのインデックス
+  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]); // 各スナップポイントの位置
 
-  const scrollPrev = useCallback(() => { if (emblaApi) emblaApi.scrollPrev(); }, [emblaApi]);
-  const scrollNext = useCallback(() => { if (emblaApi) emblaApi.scrollNext(); }, [emblaApi]);
-  const scrollTo = useCallback((index: number) => { if (emblaApi) emblaApi.scrollTo(index); }, [emblaApi]);
+  // 前のスライドへ移動する関数
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
 
-  const onInit = useCallback((emblaApiInstance: EmblaCarouselType) => { // ★ 型を EmblaCarouselType に
+  // 次のスライドへ移動する関数
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
+
+  // 特定のスライドへ移動する関数
+  const scrollTo = useCallback((index: number) => {
+    if (emblaApi) emblaApi.scrollTo(index);
+  }, [emblaApi]);
+
+  // カルーセル初期化時やリサイズ時にスナップポイントを取得する関数
+  const onInit = useCallback((emblaApiInstance: EmblaCarouselType) => {
     if (!emblaApiInstance) return;
     setScrollSnaps(emblaApiInstance.scrollSnapList());
   }, []);
 
-  const onSelect = useCallback((emblaApiInstance: EmblaCarouselType) => { // ★ 型を EmblaCarouselType に
+  // 現在のスライドやスクロール状態に応じてボタンの有効/無効とインデックスを更新する関数
+  const onSelect = useCallback((emblaApiInstance: EmblaCarouselType) => {
     if (!emblaApiInstance) return;
     setSelectedIndex(emblaApiInstance.selectedScrollSnap());
     setPrevBtnDisabled(!emblaApiInstance.canScrollPrev());
     setNextBtnDisabled(!emblaApiInstance.canScrollNext());
   }, []);
 
+  // Embla Carouselのイベントリスナーを設定
   useEffect(() => {
-    if (!emblaApi) return; // emblaApi の型は UseEmblaCarouselType だが、実質 EmblaCarouselType として扱える
+    if (!emblaApi) return;
 
-    onInit(emblaApi as EmblaCarouselType); // ★ as EmblaCarouselType でキャスト (必要に応じて)
-    onSelect(emblaApi as EmblaCarouselType); // ★ as EmblaCarouselType でキャスト (必要に応じて)
-    emblaApi.on('reInit', () => { // ★ reInit時にもonInitとonSelectを呼ぶ
-        onInit(emblaApi as EmblaCarouselType);
-        onSelect(emblaApi as EmblaCarouselType);
-    });
-    emblaApi.on('select', () => onSelect(emblaApi as EmblaCarouselType)); // ★ select時にもonSelectを呼ぶ
+    // emblaApi は EmblaCarouselType | undefined 型を持つので、型ガードを行うか、
+    // onInit, onSelect の引数型を EmblaCarouselType としているので、
+    // TypeScript が互換性を認識できるはずです。
+    // 必要であれば、 (emblaApi as EmblaCarouselType) のようにキャストします。
+    onInit(emblaApi);
+    onSelect(emblaApi);
 
+    // イベントリスナーに onSelect と onInit (リサイズ時など) を登録
+    // 渡すコールバック関数は型が一致している必要がある
+    const handleReInit = () => {
+        onInit(emblaApi);
+        onSelect(emblaApi);
+    };
+    const handleSelect = () => onSelect(emblaApi);
+
+    emblaApi.on('reInit', handleReInit);
+    emblaApi.on('select', handleSelect);
+
+    // コンポーネントのアンマウント時にイベントリスナーを解除
     return () => {
       if (emblaApi) {
-        emblaApi.off('reInit', onInit); // onInitも解除
-        emblaApi.off('reInit', onSelect);
-        emblaApi.off('select', onSelect);
+        emblaApi.off('reInit', handleReInit);
+        emblaApi.off('select', handleSelect);
       }
     };
-  }, [emblaApi, onInit, onSelect]);
-
+  }, [emblaApi, onInit, onSelect]); // 依存配列に onInit も追加
 
   return (
     <div className="relative w-full max-w-lg mx-auto">
